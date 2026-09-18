@@ -1,0 +1,85 @@
+===== ANNOTATION =====
+
+[1] TCP HANDSHAKE
+
+SYN:
+127.0.0.1.46700 -> 127.0.0.1.8080 Flags [S]
+
+SYN/ACK:
+127.0.0.1.8080 -> 127.0.0.1.46700 Flags [S.]
+
+ACK:
+127.0.0.1.46700 -> 127.0.0.1.8080 Flags [.]
+
+
+[2] HTTP REQUEST
+
+POST /notes HTTP/1.1
+Host: 127.0.0.1:8080
+Content-Type: application/json
+
+{"title":"trace me","body":"in flight"}
+
+
+[3] HTTP RESPONSE
+
+HTTP/1.1 201 Created
+
+{"id":6,"title":"trace me","body":"in flight","created_at":"2026-09-18T08:36:28.371985059Z"}
+
+
+[4] CONNECTION CLOSE
+
+Client sends FIN:
+127.0.0.1.46700 -> 127.0.0.1.8080 Flags [F.]
+
+Server sends FIN:
+127.0.0.1.8080 -> 127.0.0.1.46700 Flags [F.]
+
+
+===== FULL TCPDUMP OUTPUT =====
+11:36:28.371699 IP 127.0.0.1.46700 > 127.0.0.1.8080: Flags [S], seq 2644053149, win 65495, options [mss 65495,sackOK,TS val 1431289641 ecr 0,nop,wscale 10], length 0
+E..<..@.@.h..........l...............0.........
+UO.).......
+
+11:36:28.371709 IP 127.0.0.1.8080 > 127.0.0.1.46700: Flags [S.], seq 218513917, ack 2644053150, win 65483, options [mss 65495,sackOK,TS val 2430208255 ecr 1431289641,nop,wscale 10], length 0
+E..<..@.@.<............l..A..........0.........
+....UO.)...
+
+11:36:28.371716 IP 127.0.0.1.46700 > 127.0.0.1.8080: Flags [.], ack 1, win 64, options [nop,nop,TS val 1431289641 ecr 2430208255], length 0
+E..4..@.@.h..........l........A....@.(.....
+UO.)....
+11:36:28.371843 IP 127.0.0.1.46700 > 127.0.0.1.8080: Flags [P.], seq 1:175, ack 1, win 64, options [nop,nop,TS val 1431289642 ecr 2430208255], length 174: HTTP: POST /notes HTTP/1.1
+E.....@.@.hM.........l........A....@.......
+UO.*....POST /notes HTTP/1.1
+Host: 127.0.0.1:8080
+User-Agent: curl/8.5.0
+Accept: */*
+Content-Type: application/json
+Content-Length: 39
+
+{"title":"trace me","body":"in flight"}
+11:36:28.371847 IP 127.0.0.1.8080 > 127.0.0.1.46700: Flags [.], ack 175, win 64, options [nop,nop,TS val 2430208256 ecr 1431289642], length 0
+E..4.P@.@.~q...........l..A....L...@.(.....
+..	.UO.*
+11:36:28.377026 IP 127.0.0.1.8080 > 127.0.0.1.46700: Flags [P.], seq 1:207, ack 175, win 64, options [nop,nop,TS val 2430208261 ecr 1431289642], length 206: HTTP: HTTP/1.1 201 Created
+E....Q@.@.}............l..A....L...@.......
+..	.UO.*HTTP/1.1 201 Created
+Content-Type: application/json
+Date: Fri, 18 Sep 2026 08:36:28 GMT
+Content-Length: 93
+
+{"id":6,"title":"trace me","body":"in flight","created_at":"2026-09-18T08:36:28.371985059Z"}
+
+11:36:28.377051 IP 127.0.0.1.46700 > 127.0.0.1.8080: Flags [.], ack 207, win 64, options [nop,nop,TS val 1431289647 ecr 2430208261], length 0
+E..4..@.@.h..........l.....L..B....@.(.....
+UO./..	.
+11:36:28.377202 IP 127.0.0.1.46700 > 127.0.0.1.8080: Flags [F.], seq 175, ack 207, win 64, options [nop,nop,TS val 1431289647 ecr 2430208261], length 0
+E..4..@.@.h..........l.....L..B....@.(.....
+UO./..	.
+11:36:28.377255 IP 127.0.0.1.8080 > 127.0.0.1.46700: Flags [F.], seq 207, ack 176, win 64, options [nop,nop,TS val 2430208261 ecr 1431289647], length 0
+E..4.R@.@.~o...........l..B....M...@.(.....
+..	.UO./
+11:36:28.377270 IP 127.0.0.1.46700 > 127.0.0.1.8080: Flags [.], ack 208, win 64, options [nop,nop,TS val 1431289647 ecr 2430208261], length 0
+E..4..@.@.h..........l.....M..B....@.(.....
+UO./..	.
