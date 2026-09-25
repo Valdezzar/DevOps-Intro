@@ -1,6 +1,8 @@
 Vagrant.configure("2") do |config|
-  config.vm.box = "bento/ubuntu-24.04"
+  config.vm.box = "bento/ubuntu-22.04"
   config.vm.hostname = "quicknotes-lab5"
+  config.vm.boot_timeout = 600
+  config.ssh.insert_key = false
 
   config.vm.network "forwarded_port",
     guest: 8080,
@@ -41,6 +43,8 @@ Vagrant.configure("2") do |config|
     ln -sf /usr/local/go/bin/go /usr/local/bin/go
     ln -sf /usr/local/go/bin/gofmt /usr/local/bin/gofmt
 
+    install -d -m 0755 /var/lib/quicknotes
+
     cd /opt/quicknotes/app
     /usr/local/go/bin/go build -o /usr/local/bin/quicknotes .
 
@@ -53,6 +57,8 @@ Vagrant.configure("2") do |config|
       'Type=simple' \
       'WorkingDirectory=/opt/quicknotes/app' \
       'Environment=ADDR=:8080' \
+      'Environment=DATA_PATH=/var/lib/quicknotes/notes.json' \
+      'Environment=SEED_PATH=/opt/quicknotes/app/seed.json' \
       'ExecStart=/usr/local/bin/quicknotes' \
       'Restart=always' \
       'RestartSec=2' \

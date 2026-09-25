@@ -1,26 +1,30 @@
 # Lab 5 submission
 
-## Task 1: Vagrant VM
+## Task 1
 
-I used Vagrant with VirtualBox to run QuickNotes inside an Ubuntu 24.04 VM.
+I used Vagrant with VirtualBox to run QuickNotes in a local Ubuntu VM.
+
+The successful VM runs Ubuntu 22.04.5 LTS. The assignment allows Ubuntu 22.04 or 24.04 LTS. I used 22.04 because `bento/ubuntu-24.04` hit a VirtualBox CPU fault during boot on this host, with `VERR_CPUM_RAISE_GP_0` in the VirtualBox log.
 
 The VM uses:
 
-- Ubuntu 24.04
+- Ubuntu 22.04.5 LTS
+- Go 1.24.5
 - 2 vCPUs
 - 1024 MB RAM
 - NAT networking
 - host port `127.0.0.1:18080` forwarded to guest port `8080`
 - VirtualBox shared folders
-- Go 1.24.5
 - shell provisioning
 
 ## Vagrantfile
 
 ```ruby
 Vagrant.configure("2") do |config|
-  config.vm.box = "bento/ubuntu-24.04"
+  config.vm.box = "bento/ubuntu-22.04"
   config.vm.hostname = "quicknotes-lab5"
+  config.vm.boot_timeout = 600
+  config.ssh.insert_key = false
 
   config.vm.network "forwarded_port",
     guest: 8080,
@@ -61,6 +65,8 @@ Vagrant.configure("2") do |config|
     ln -sf /usr/local/go/bin/go /usr/local/bin/go
     ln -sf /usr/local/go/bin/gofmt /usr/local/bin/gofmt
 
+    install -d -m 0755 /var/lib/quicknotes
+
     cd /opt/quicknotes/app
     /usr/local/go/bin/go build -o /usr/local/bin/quicknotes .
 
@@ -73,6 +79,8 @@ Vagrant.configure("2") do |config|
       'Type=simple' \
       'WorkingDirectory=/opt/quicknotes/app' \
       'Environment=ADDR=:8080' \
+      'Environment=DATA_PATH=/var/lib/quicknotes/notes.json' \
+      'Environment=SEED_PATH=/opt/quicknotes/app/seed.json' \
       'ExecStart=/usr/local/bin/quicknotes' \
       'Restart=always' \
       'RestartSec=2' \
@@ -88,27 +96,33 @@ Vagrant.configure("2") do |config|
 end
 ```
 
-## First `vagrant up`
-
-The first lines of the initial run were:
+## First 10 useful lines of `vagrant up --provider=virtualbox`
 
 ```text
 Bringing machine 'default' up with 'virtualbox' provider...
-==> default: Box 'bento/ubuntu-24.04' could not be found. Attempting to find and install...
-    default: Box Provider: virtualbox
-    default: Box Version: >= 0
-==> default: Loading metadata for box 'bento/ubuntu-24.04'
-    default: URL: https://vagrantcloud.com/api/v2/vagrant/bento/ubuntu-24.04
-==> default: Adding box 'bento/ubuntu-24.04' (v202510.26.0) for provider: virtualbox (amd64)
-    default: Downloading: https://vagrantcloud.com/bento/boxes/ubuntu-24.04/versions/202510.26.0/providers/virtualbox/amd64/vagrant.box
-
-[KProgress: 1% (Rate: 4245k/s, Estimated time remaining: 0:06:38)
+==> default: Importing base box 'bento/ubuntu-22.04'...
+Progress: 10%
+Progress: 90%
+==> default: Matching MAC address for NAT networking...
+==> default: Checking if box 'bento/ubuntu-22.04' version '202510.26.0' is up to date...
+==> default: Setting the name of the VM: quicknotes-lab5
+==> default: Clearing any previously set network interfaces...
+==> default: Preparing network interfaces based on configuration...
+    default: Adapter 1: nat
 ```
 
-The VM booted successfully.
+## VM status
+
+Command:
 
 ```text
-default running (virtualbox)
+vagrant status
+```
+
+Output:
+
+```text
+default                   running (virtualbox)
 ```
 
 ## Go version inside VM
@@ -125,7 +139,23 @@ Output:
 go version go1.24.5 linux/amd64
 ```
 
-## QuickNotes inside VM
+## Resource check
+
+VirtualBox reported:
+
+```text
+cpus=2
+memory=1024
+```
+
+Inside the VM:
+
+```text
+2
+Mem:             957         210         229           0         517         584
+```
+
+## QuickNotes health inside VM
 
 Command:
 
@@ -136,79 +166,126 @@ vagrant ssh -c "curl -s http://127.0.0.1:8080/health"
 Output:
 
 ```json
-{"notes":6,"status":"ok"}
+{"notes":4,"status":"ok"}
 ```
 
-## QuickNotes from Windows host
+## QuickNotes health from Windows host
 
 Command:
 
 ```text
-curl http://127.0.0.1:18080/health
+curl.exe -s http://127.0.0.1:18080/health
 ```
 
 Output:
 
 ```json
-{"notes":6,"status":"ok"}
+{"notes":4,"status":"ok"}
 ```
-
-The port forwarding from host port 18080 to guest port 8080 works.
 
 ## Design questions
 
 ### a) Synced folders
 
-I used the VirtualBox shared-folder provider. It works directly with the VirtualBox provider and keeps the host `app` directory visible inside the VM without a separate sync command. The main trade-off is that shared-folder performance can be slower than a native Linux filesystem, especially with many small files.
+I used VirtualBox shared folders. They are simple with the VirtualBox provider and make the host `app` directory appear inside the VM at `/opt/quicknotes/app`. The trade-off is that shared folders can be slower than a native Linux filesystem for workloads with many small files.
 
 ### b) NAT vs Bridged vs Host-only
 
-The VM uses NAT, which is Vagrant's default networking mode. The application port is forwarded only to `127.0.0.1` on the host. This is safer than a bridged adapter because the VM service is not directly exposed to other machines on the physical network.
+The VM uses NAT, which is Vagrant's default network mode. The QuickNotes port is forwarded only to `127.0.0.1` on the host. That is safer for this course exercise than a bridged interface because other machines on the physical network cannot connect to the guest service directly.
 
 ### c) Provisioning
 
-I used the shell provisioner. Installing one pinned Go version and creating one systemd service are simple tasks, so adding Ansible or another configuration-management tool would add unnecessary complexity for this lab.
+I used shell provisioning. It is enough for installing one pinned Go version, building the app, and writing one systemd service. A larger tool would add extra complexity for this lab.
 
-### d) Why pin Go 1.24.5
+### d) Go pinning
 
-Using exactly Go 1.24.5 makes provisioning reproducible. If the configuration only requested Go 1.24, a later point release could change compiler behavior or tooling without any change to the repository.
+Pinning Go to `1.24.5` makes the VM reproducible. A floating `1.24` value could install a different point release later and change compiler or tool behavior without a repository change.
 
-# Task 2: Snapshot, Break, Restore
+## Task 2
 
-## Save
+Before saving the snapshot, I checked that the VM was healthy.
 
-I first verified that the VM was working and then created a snapshot:
+```text
+go version go1.24.5 linux/amd64
+{"notes":4,"status":"ok"}
+{"notes":4,"status":"ok"}
+```
+
+I halted the VM before taking the snapshot. VirtualBox reported:
+
+```text
+VMState="poweroff"
+```
+
+## Snapshot save
+
+Command:
 
 ```text
 vagrant snapshot save clean-lab5
 ```
 
-The snapshot list showed:
+Output:
 
 ```text
+==> default: Snapshotting the machine as 'clean-lab5'...
+==> default: Snapshot saved! You can restore the snapshot at any time by
+==> default: using `vagrant snapshot restore`. You can delete it using
+==> default: `vagrant snapshot delete`.
+```
+
+Snapshot list:
+
+```text
+==> default:
 clean-lab5
+```
+
+After saving the snapshot, I started the VM with:
+
+```text
+vagrant up --no-provision
+```
+
+Go and QuickNotes still worked:
+
+```text
+go version go1.24.5 linux/amd64
+{"notes":4,"status":"ok"}
+{"notes":4,"status":"ok"}
 ```
 
 ## Break
 
-I deliberately removed the Go command and moved the Go installation:
+Commands:
 
 ```text
-sudo rm -f /usr/local/bin/go /usr/local/bin/gofmt
-sudo mv /usr/local/go /usr/local/go.broken
+vagrant ssh -c "sudo rm -f /usr/local/bin/go /usr/local/bin/gofmt"
+vagrant ssh -c "sudo mv /usr/local/go /usr/local/go.broken"
 ```
 
-Verification:
+Verification command:
 
 ```text
+vagrant ssh -c "if go version; then echo UNEXPECTED_GO_FOUND; else echo EXPECTED_FAILURE_GO_NOT_FOUND; fi"
+```
+
+Output:
+
+```text
+bash: line 1: go: command not found
 EXPECTED_FAILURE_GO_NOT_FOUND
 ```
 
-This confirmed that the VM had been deliberately broken.
-
 ## Restore
 
-I restored the VM with:
+I halted the broken VM first. VirtualBox reported:
+
+```text
+VMState="poweroff"
+```
+
+Restore command:
 
 ```text
 vagrant snapshot restore clean-lab5 --no-provision
@@ -217,50 +294,54 @@ vagrant snapshot restore clean-lab5 --no-provision
 Restore time:
 
 ```text
-21.39 seconds
+48.32 seconds
+```
+
+Vagrant restored the snapshot and started the VM without provisioning:
+
+```text
+==> default: Machine not provisioned because `--no-provision` is specified.
 ```
 
 ## Verify recovery
 
-After restoring the snapshot:
+Go version after restore:
 
 ```text
-
+go version go1.24.5 linux/amd64
 ```
 
-The QuickNotes systemd service returned:
+QuickNotes service state after restore:
 
 ```text
-
+active
 ```
 
-Health check inside the VM:
+Health check inside the VM after restore:
 
 ```json
-
+{"notes":4,"status":"ok"}
 ```
 
-Health check from Windows through the forwarded port:
+Health check from Windows after restore:
 
 ```json
-
+{"notes":4,"status":"ok"}
 ```
-
-The snapshot successfully restored the Go installation and the working QuickNotes service.
 
 ## Design questions
 
 ### e) Why snapshots are not backups
 
-A snapshot depends on the original VM and its storage. If the host disk, VM files, or VirtualBox storage are lost or corrupted, the snapshot can disappear with them. A real backup should exist independently from the system it protects.
+Snapshots depend on the original VM storage. If the host disk, VM directory, or VirtualBox files are lost or corrupted, the snapshot can be lost too. A real backup must exist independently from the VM it protects.
 
 ### f) Copy-on-write
 
-A snapshot does not immediately create another full copy of the virtual disk. VirtualBox keeps the original state and stores later changes in additional differencing files. Ten snapshots therefore do not automatically use ten times the original disk size, but their changed blocks accumulate and can still consume a large amount of space.
+VirtualBox snapshots store changed disk blocks instead of copying the whole disk every time. Ten snapshots do not immediately mean ten full disk copies. The changed blocks still accumulate, so long snapshot chains can use a lot of space.
 
-### g) When snapshotting becomes an antipattern
+### g) Snapshot antipattern
 
-Long snapshot chains make storage harder to manage and increase dependency on multiple differencing disks. They can also make recovery and deletion slower and more fragile. Snapshots are useful for short experiments and rollback points, but they should not replace reproducible provisioning or proper backups.
+Long snapshot chains are harder to manage, slower to work with, and more fragile. Snapshots are good short-term rollback points for experiments. They should not replace reproducible provisioning or independent backups.
 
 ## Bonus
 
