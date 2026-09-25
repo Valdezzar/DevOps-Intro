@@ -90,6 +90,9 @@
             state: present
             update_cache: true
             cache_valid_time: 3600
+          environment:
+            DEBIAN_FRONTEND: noninteractive
+            NEEDRESTART_MODE: a
 
         - name: Ensure /etc/ansible exists
           ansible.builtin.file:
