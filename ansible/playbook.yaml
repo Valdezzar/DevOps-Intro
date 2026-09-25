@@ -73,7 +73,7 @@
       ansible.builtin.meta: flush_handlers
 
     - name: Enable and start quicknotes
-      ansible.builtin.systemd_service:
+      ansible.builtin.systemd:
         name: "{{ quicknotes_service_name }}"
         enabled: true
         state: started
@@ -140,7 +140,7 @@
           ansible.builtin.meta: flush_handlers
 
         - name: Enable and start ansible-pull timer
-          ansible.builtin.systemd_service:
+          ansible.builtin.systemd:
             name: "{{ ansible_pull_service_name }}.timer"
             enabled: true
             state: started
@@ -148,12 +148,12 @@
 
   handlers:
     - name: reload systemd
-      ansible.builtin.systemd_service:
+      ansible.builtin.systemd:
         daemon_reload: true
       when: not ansible_check_mode
 
     - name: restart quicknotes
-      ansible.builtin.systemd_service:
+      ansible.builtin.systemd:
         name: "{{ quicknotes_service_name }}"
         state: restarted
       when: not ansible_check_mode
