@@ -80,7 +80,6 @@
       when: not ansible_check_mode
 
     - name: Configure ansible-pull GitOps loop
-      when: enable_ansible_pull | bool
       block:
         - name: Install ansible-pull dependencies
           ansible.builtin.apt:
@@ -93,6 +92,7 @@
           environment:
             DEBIAN_FRONTEND: noninteractive
             NEEDRESTART_MODE: a
+          when: enable_ansible_pull | bool
 
         - name: Ensure /etc/ansible exists
           ansible.builtin.file:
@@ -101,6 +101,7 @@
             owner: root
             group: root
             mode: "0755"
+          when: enable_ansible_pull | bool
 
         - name: Install local inventory for ansible-pull
           ansible.builtin.template:
@@ -109,6 +110,7 @@
             owner: root
             group: root
             mode: "0644"
+          when: enable_ansible_pull | bool
 
         - name: Ensure ansible-pull working directory exists
           ansible.builtin.file:
@@ -117,6 +119,7 @@
             owner: root
             group: root
             mode: "0755"
+          when: enable_ansible_pull | bool
 
         - name: Install ansible-pull service unit
           ansible.builtin.template:
@@ -126,6 +129,7 @@
             group: root
             mode: "0644"
           notify: reload systemd
+          when: enable_ansible_pull | bool
 
         - name: Install ansible-pull timer unit
           ansible.builtin.template:
@@ -135,6 +139,7 @@
             group: root
             mode: "0644"
           notify: reload systemd
+          when: enable_ansible_pull | bool
 
         - name: Apply pending ansible-pull handlers before timer start
           ansible.builtin.meta: flush_handlers
@@ -144,7 +149,9 @@
             name: "{{ ansible_pull_service_name }}.timer"
             enabled: true
             state: started
-          when: not ansible_check_mode
+          when:
+            - not ansible_check_mode
+            - enable_ansible_pull | bool
 
   handlers:
     - name: reload systemd
